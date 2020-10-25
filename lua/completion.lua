@@ -250,12 +250,37 @@ M.on_attach = function(option)
     api.nvim_command("autocmd InsertCharPre <buffer> lua require'completion'.on_InsertCharPre()")
     api.nvim_command("autocmd CompleteDone <buffer> lua require'completion'.on_CompleteDone()")
   api.nvim_command("augroup end")
-  if string.len(opt.get_option('confirm_key')) ~= 0 then
-    api.nvim_buf_set_keymap(0, 'i', opt.get_option('confirm_key'),
+  
+  -- do we have a confirm key to set
+  local confirm_key = opt.get_option('confirm_key')
+  if string.len(confirm_key) ~= 0 then
+
+    -- is the confirm key clear in the current buffer?
+    local imaps = api.nvim_buf_get_keymap(0, "i")
+    -- not sure if there's a nicer way to do this in raw lua, ideally you'd filter/reduce/etc
+    local can_map = true
+    for _,map in ipairs(imaps) do
+      local lhs = map.lhs
+      local lhs_termcode = api.nvim_replace_termcodes(lhs, true, false, true)
+      -- check against "string"/normal maps and maps that have been encoded.
+      -- not sure if you can just call replace_termcodes on a term-coded string
+      -- so to make sure confirm_key's that are set via "<cr>" or ^M are matched
+      if lhs == confirm_key or lhs_termcode == confirm_key then
+        can_map = false
+      end
+    end
+
+    -- our map wont conflict, so make it
+    if can_map then
+      api.nvim_buf_set_keymap(0, 'i', confirm_key,
       'pumvisible() ? complete_info()["selected"] != "-1" ? "\\<Plug>(completion_confirm_completion)" :'..
       ' "\\<c-e>\\<CR>" : "\\<CR>"',
       {silent=false, noremap=false, expr=true})
+    else
+      -- print an error? try alternate bind? segfault out of spite?
+    end
   end
+  
   vim.b.completion_enable = 1
 end
 
